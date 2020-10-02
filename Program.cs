@@ -18,7 +18,10 @@ namespace Altra
     private const string _dailyAdjustedFuntionName = "TIME_SERIES_DAILY_ADJUSTED";
     private const string _globalQuoteFuntionName = "GLOBAL_QUOTE";
     private const string _smaFuntionName = "SMA";
-    private const string _timePeriod = "10";
+    private const int _timePeriod10 = 10;
+    private const int _timePeriod20 = 20;
+    private const int _timePeriod50 = 50;
+    private const int _timePeriod200 = 200;
     private const string _interval = "daily";
     private const string _seriesType = "close";
     private readonly static HttpClient _client = new HttpClient();
@@ -26,11 +29,13 @@ namespace Altra
     static async Task Main(string[] args)
     {
       // https://www.alphavantage.co/documentation/#dailyadj
-      var dailyAdjustedUrl = $"https://www.alphavantage.co/query?function={_dailyAdjustedFuntionName}&symbol={_symbol}&apikey={_apiKey}";
+      var dailyAdjustedUrl = $"https://www.alphavantage.co/query?function={_dailyAdjustedFuntionName}&symbol={_symbol}&outputsize=full&apikey={_apiKey}";
       // https://www.alphavantage.co/documentation/#latestprice
       var quoteUrl = $"https://www.alphavantage.co/query?function={_globalQuoteFuntionName}&symbol={_symbol}&apikey={_apiKey}";
       // https://www.alphavantage.co/documentation/#sma
-      var smaUrl = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod}&series_type={_seriesType}&apikey={_apiKey}";
+      var sma50Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod50.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
+      var sma200Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod200.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
+
 
       try
       {
@@ -77,7 +82,16 @@ namespace Altra
 
 
         // Get todays date (Eastern)
-        TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+        //TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+        TimeZoneInfo easternZone;
+        try
+        {
+            easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            easternZone = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+        }
         var todaysDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, easternZone).Date.ToString("yyyy-MM-dd");
 
         // Get current price
@@ -87,29 +101,37 @@ namespace Altra
         var quote = ParseResponse<Quote>(quoteResponseBody, "Global Quote");
         var currentPrice = quote.Price;
 
-        // Get current SMA
-        string smaResponseBody = await _client.GetStringAsync(smaUrl);
-        var smaRaw = JObject.Parse(smaResponseBody);
-        var smaMetaData = smaRaw["Meta Data"].ToObject<SmaMetaData>();
-        var sma = smaRaw["Technical Analysis: SMA"][todaysDate]["SMA"].ToObject<string>();
-        //var sma = decimal.Parse(smaRaw[todaysDate].ToObject<string>());
-        Console.WriteLine("Alpha SMA(" + _timePeriod + "): " + sma);
+        // Get current SMA50
+        string sma50ResponseBody = await _client.GetStringAsync(sma50Url);
+        var sma50Raw = JObject.Parse(sma50ResponseBody);
+        var sma50MetaData = sma50Raw["Meta Data"].ToObject<SmaMetaData>();
+        var sma50 = sma50Raw["Technical Analysis: SMA"][todaysDate]["SMA"].ToObject<string>();
+        Console.WriteLine("Alpha SMA(" + _timePeriod50.ToString() + "): " + sma50);
 
-        HttpResponseMessage response = await _client.GetAsync(dailyAdjustedUrl);
-        response.EnsureSuccessStatusCode();
-        string responseBody = await response.Content.ReadAsStringAsync();
+        // Get current SMA200
+        string sma200ResponseBody = await _client.GetStringAsync(sma200Url);
+        var sma200Raw = JObject.Parse(sma200ResponseBody);
+        var sma200MetaData = sma200Raw["Meta Data"].ToObject<SmaMetaData>();
+        var sma200 = sma200Raw["Technical Analysis: SMA"][todaysDate]["SMA"].ToObject<string>();
+        Console.WriteLine("Alpha SMA(" + _timePeriod200.ToString() + "): " + sma200);
+
+        // HttpResponseMessage response = await _client.GetAsync(dailyAdjustedUrl);
+        // response.EnsureSuccessStatusCode();
+        // string responseBody = await response.Content.ReadAsStringAsync();
         // Above three lines can be replaced with new helper method below
-        // string responseBody = await client.GetStringAsync(uri);
+        string responseBody = await _client.GetStringAsync(dailyAdjustedUrl);
 
         var daily = JObject.Parse(responseBody);
         var metaData = daily["Meta Data"].ToObject<InstrumentMetaData>();
         var timeSeriesRaw = daily["Time Series (Daily)"];
         var timeSeriesChildren = timeSeriesRaw.Children();
         var instruments = timeSeriesChildren.Select(ins => ins.First().ToObject<Instrument>());
-        var term = 10;
 
+        var calculatedSma50 = CalculateSMA(_timePeriod50, instruments.Take(_timePeriod50));
+        var calculatedSma200 = CalculateSMA(_timePeriod200, instruments.Take(_timePeriod200));
         //CWObject(metaData);
-        Console.WriteLine("SMA(" + term + "): " + CalculateSMA(term, instruments.Take(term)));
+        Console.WriteLine("SMA(" + _timePeriod50 + "): " + calculatedSma50);
+        Console.WriteLine("SMA(" + _timePeriod200 + "): " + calculatedSma200);
       }
       catch (HttpRequestException e)
       {
@@ -132,7 +154,6 @@ namespace Altra
         Console.WriteLine(p.Name + ": " + p.GetValue(obj));
       }
     }
-
 
     private static decimal CalculateSMA(int term, IEnumerable<Instrument> instruments) => instruments.Sum(i => decimal.Parse(i.Close)) / term;
 
