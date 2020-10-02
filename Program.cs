@@ -15,7 +15,7 @@ namespace Altra
     // Mid-term trend: 50 days
     // Long-term trend: 200 days
     private const string _apiKey = "C7PW7X54ISBEKC4N";
-    private const string _symbol = "IBM";
+    private const string _symbol = "TSLA";
     private const string _dailyAdjustedFuntionName = "TIME_SERIES_DAILY_ADJUSTED";
     private const string _globalQuoteFuntionName = "GLOBAL_QUOTE";
     private const string _smaFuntionName = "SMA";
@@ -35,6 +35,7 @@ namespace Altra
 
     static async Task Main(string[] args)
     {
+      // TODO: while market open
       while (true)
       {
         // https://www.alphavantage.co/documentation/#latestprice
@@ -57,7 +58,6 @@ namespace Altra
         // 4. BUY/SELL
         // if the price is > MA --> signal to BUY with stop loss below the MA
         // if the price is < MA --> signal to SELL with stop loss above the MA
-
 
         // TYPES
         // 1. SMA - Simple Moving Average
@@ -82,6 +82,7 @@ namespace Altra
         // Example 2: When a shorter period MA crosses below a longer period MA - signal downtrend --> signal to sell (Bearish).
 
         Console.WriteLine(DateTime.UtcNow);
+        Console.WriteLine("Symbol: " + _symbol);
         // Get current price
         string quoteResponseBody = await _client.GetStringAsync(quoteUrl);
         var quote = ParseResponse<Quote>(quoteResponseBody, "Global Quote");
@@ -115,7 +116,9 @@ namespace Altra
             break;
         }
         Console.WriteLine("***************************");
-        Console.WriteLine("Result: " + string.Format("{0:C}", _account));
+        Console.WriteLine("Position: " + string.Format("{0:C}", _position.Value));
+        Console.WriteLine("Cash: " + string.Format("{0:C}", _account));
+        Console.WriteLine("Total: " + string.Format("{0:C}", _position.Value + _account));
         Console.WriteLine("***************************");
 
         // Sleep for 5 min and repeat
@@ -128,16 +131,15 @@ namespace Altra
       var quoteRaw = JObject.Parse(responseBody);
       return quoteRaw[token].ToObject<T>();
     }
-    private static void CWObject(object obj)
+    private static void CWObject(object obj, int indent = 0)
     {
       var type = obj.GetType();
       var properties = type.GetProperties();
       foreach (var p in properties)
       {
-        Console.WriteLine(p.Name + ": " + p.GetValue(obj));
+        Console.WriteLine(Indent(indent) + p.Name + ": " + p.GetValue(obj));
       }
     }
-
     private static async Task<decimal> GetSma(string url, int timePeriod)
     {
       decimal smaResult = 0;
@@ -150,7 +152,7 @@ namespace Altra
         var smaRaw = JObject.Parse(responseBody);
         var smaMetaData = smaRaw["Meta Data"].ToObject<SmaMetaData>();
         var sma = smaRaw["Technical Analysis: SMA"][smaMetaData.LastRefreshed]["SMA"].ToObject<string>();
-        Console.WriteLine("Alpha SMA(" + timePeriod.ToString() + "): " + sma);
+        Console.WriteLine("SMA(" + timePeriod.ToString() + "): " + sma);
         smaResult = decimal.Parse(sma);
       }
       catch (HttpRequestException e)
@@ -160,7 +162,6 @@ namespace Altra
       }
       return smaResult;
     }
-
     private static TrendType UpdateTrend()
     {
       if ((_trend == TrendType.Unknown || _trend == TrendType.Down) && _sma50 > _sma200)
@@ -171,9 +172,12 @@ namespace Altra
       //   _trend = TrendType.Unknown;
       return _trend;
     }
-
     private static ActionSignalType GetActionSignal()
     {
+      // if currently holding a position do nothing
+      if (_position != null)
+        return ActionSignalType.DoNothing;
+
       switch (_trend)
       {
         case TrendType.Up:
@@ -185,7 +189,6 @@ namespace Altra
           return ActionSignalType.DoNothing; ;
       }
     }
-
     private static void Buy()
     {
       if (_account <= 0)
@@ -225,9 +228,8 @@ namespace Altra
           }
         }
       }
-      CWObject(_position);
+      CWObject(_position, 2);
     }
-
     private static void Sell()
     {
       if (_position == null)
@@ -270,6 +272,8 @@ namespace Altra
     }
 
     private static decimal CalculateSMA(int term, IEnumerable<Instrument> instruments) => instruments.Sum(i => decimal.Parse(i.Close)) / term;
+
+    private static string Indent(int count) => "".PadLeft(count);
 
     #region Helper Classes
     internal enum TrendType
