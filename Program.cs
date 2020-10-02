@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -28,85 +29,106 @@ namespace Altra
 
     static async Task Main(string[] args)
     {
-      // https://www.alphavantage.co/documentation/#dailyadj
-      var dailyAdjustedUrl = $"https://www.alphavantage.co/query?function={_dailyAdjustedFuntionName}&symbol={_symbol}&outputsize=full&apikey={_apiKey}";
-      // https://www.alphavantage.co/documentation/#latestprice
-      var quoteUrl = $"https://www.alphavantage.co/query?function={_globalQuoteFuntionName}&symbol={_symbol}&apikey={_apiKey}";
-      // https://www.alphavantage.co/documentation/#sma
-      var sma50Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod50.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
-      var sma200Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod200.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
-
-      try
+      while (true)
       {
-        // Moving Average
-        // 1. Identify Trends (up, down)
-        // if the price is > MA --> uptrend
-        // if the price is < MA --> downtrend
+        // https://www.alphavantage.co/documentation/#latestprice
+        var quoteUrl = $"https://www.alphavantage.co/query?function={_globalQuoteFuntionName}&symbol={_symbol}&apikey={_apiKey}";
+        // https://www.alphavantage.co/documentation/#sma
+        var sma50Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod50.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
+        var sma200Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod200.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
 
-        // 2. Confirm Reversals
-        // if the price is = MA --> trend reversal
+        try
+        {
+          // Moving Average
+          // 1. Identify Trends (up, down)
+          // if the price is > MA --> uptrend
+          // if the price is < MA --> downtrend
 
-        // 3. Identify Support and Resistance Level
-        // TODO
+          // 2. Confirm Reversals
+          // if the price is = MA --> trend reversal
 
-        // 4. BUY/SELL
-        // if the price is > MA --> signal to BUY with stop loss below the MA
-        // if the price is < MA --> signal to SELL with stop loss above the MA
+          // 3. Identify Support and Resistance Level
+          // TODO
 
-
-        // TYPES
-        // 1. SMA - Simple Moving Average
-        // Summary: Equal weight to all periods - laggy price reaction
-        // Good for: Mid- to Long-term trends
-        // Calculation: Sum of closing price for given period (days) / period length (number of days)
-        // Example: 10 closing prices for each day in 10 days (c1+c2+...c10)/10
-
-        // 2. WMA - Weighted Moving Average 
-        // Summary: Responds faster to price action, more weight to recent periods, less weight to older periods, reflect a quicker shift in sentiment 
-        // Good for: Short-term trends
-        // Calculation: TODO
-
-        // 3. EMA - Exponential Moving Average 
-        // Summary: Responds faster to price action, more weight to recent periods, less weight to older periods, reflect a quicker shift in sentiment 
-        // Good for: Short-term trends
-        // Calculation: TODO
-
-        // MA Crossovers
-        // Summary: Combination of MA's reflecting two different time periods (short-term with long-term) create opportunity to trade MA Crossovers - used to determine if the trend has changed direction
-        // Example 1: When a shorter period MA crosses above a longer period MA - signal uptrend --> signal to buy (Bullish).
-        // Example 2: When a shorter period MA crosses below a longer period MA - signal downtrend --> signal to sell (Bearish).
+          // 4. BUY/SELL
+          // if the price is > MA --> signal to BUY with stop loss below the MA
+          // if the price is < MA --> signal to SELL with stop loss above the MA
 
 
+          // TYPES
+          // 1. SMA - Simple Moving Average
+          // Summary: Equal weight to all periods - laggy price reaction
+          // Good for: Mid- to Long-term trends
+          // Calculation: Sum of closing price for given period (days) / period length (number of days)
+          // Example: 10 closing prices for each day in 10 days (c1+c2+...c10)/10
+
+          // 2. WMA - Weighted Moving Average 
+          // Summary: Responds faster to price action, more weight to recent periods, less weight to older periods, reflect a quicker shift in sentiment 
+          // Good for: Short-term trends
+          // Calculation: TODO
+
+          // 3. EMA - Exponential Moving Average 
+          // Summary: Responds faster to price action, more weight to recent periods, less weight to older periods, reflect a quicker shift in sentiment 
+          // Good for: Short-term trends
+          // Calculation: TODO
+
+          // MA Crossovers
+          // Summary: Combination of MA's reflecting two different time periods (short-term with long-term) create opportunity to trade MA Crossovers - used to determine if the trend has changed direction
+          // Example 1: When a shorter period MA crosses above a longer period MA - signal uptrend --> signal to buy (Bullish).
+          // Example 2: When a shorter period MA crosses below a longer period MA - signal downtrend --> signal to sell (Bearish).
 
 
 
-        // Get current price
-        string quoteResponseBody = await _client.GetStringAsync(quoteUrl);
-        var quote = ParseResponse<Quote>(quoteResponseBody, "Global Quote");
-        var currentPrice = quote.Price;
 
-        // Get current SMA50
-        var sma50 = await GetSma(sma50Url, _timePeriod50);
+          Console.WriteLine(DateTime.UtcNow);
+          // Get current price
+          string quoteResponseBody = await _client.GetStringAsync(quoteUrl);
+          var quote = ParseResponse<Quote>(quoteResponseBody, "Global Quote");
+          var currentPrice = quote.Price;
+          Console.WriteLine("Price: " + currentPrice);
 
-        // Get current SMA200
-        var sma200 = await GetSma(sma200Url, _timePeriod200);
+          // Get current SMA50
+          var sma50 = await GetSma(sma50Url, _timePeriod50);
 
-        // Uptrend/Downtrend
-        var trend = string.Empty;
-        if(sma50 > sma200)
-          trend = "Uptrend";
-        else if (sma50 < sma200)
-          trend = "Downtrend";
-        else
-          trend = string.Empty;
-        
-        
+          // Get current SMA200
+          var sma200 = await GetSma(sma200Url, _timePeriod200);
 
-      }
-      catch (HttpRequestException e)
-      {
-        Console.WriteLine("\nException Caught!");
-        Console.WriteLine("Message :{0} ", e.Message);
+          // Trend & Buy/Sell
+          var trend = TrendType.Unknown;
+          var actionSignal = ActionSignalType.Unknown;
+          if ((trend == TrendType.Unknown || trend == TrendType.Down) && sma50 > sma200)
+          {
+            // Signal Up-trend
+            trend = TrendType.Up;
+            // Signal to Buy
+            // Buy();
+            actionSignal = ActionSignalType.Buy;
+            Console.WriteLine(actionSignal.ToString());
+          }
+          else if ((trend == TrendType.Unknown || trend == TrendType.Up) && sma50 < sma200)
+          {
+            // Signal Down-trend
+            trend = TrendType.Down;
+            // Signal to Sell
+            // Sell();
+            actionSignal = ActionSignalType.Sell;
+            Console.WriteLine(actionSignal.ToString());
+          }
+          else
+            trend = TrendType.Unknown;
+
+          Console.WriteLine("Trend: " + trend.ToString());
+
+
+        }
+        catch (HttpRequestException e)
+        {
+          Console.WriteLine("\nException Caught!");
+          Console.WriteLine("Message :{0} ", e.Message);
+        }
+
+        // Sleep for 5 min and repeat
+        Thread.Sleep(300000);
       }
     }
 
@@ -131,33 +153,50 @@ namespace Altra
       var smaRaw = JObject.Parse(smaResponseBody);
       var smaMetaData = smaRaw["Meta Data"].ToObject<SmaMetaData>();
       var sma = smaRaw["Technical Analysis: SMA"][smaMetaData.LastRefreshed]["SMA"].ToObject<string>();
-      Console.WriteLine("Alpha SMA(" + _timePeriod200.ToString() + "): " + sma);
-      return decimal.Parse(sma);    
+      Console.WriteLine("Alpha SMA(" + timePeriod.ToString() + "): " + sma);
+      return decimal.Parse(sma);
     }
     private static async Task Test()
     {
+      // https://www.alphavantage.co/documentation/#dailyadj
+      var dailyAdjustedUrl = $"https://www.alphavantage.co/query?function={_dailyAdjustedFuntionName}&symbol={_symbol}&outputsize=full&apikey={_apiKey}";
       // HttpResponseMessage response = await _client.GetAsync(dailyAdjustedUrl);
-        // response.EnsureSuccessStatusCode();
-        // string responseBody = await response.Content.ReadAsStringAsync();
-        // Above three lines can be replaced with new helper method below
-        string responseBody = await _client.GetStringAsync(dailyAdjustedUrl);
+      // response.EnsureSuccessStatusCode();
+      // string responseBody = await response.Content.ReadAsStringAsync();
+      // Above three lines can be replaced with new helper method below
+      string responseBody = await _client.GetStringAsync(dailyAdjustedUrl);
 
-        var daily = JObject.Parse(responseBody);
-        var metaData = daily["Meta Data"].ToObject<InstrumentMetaData>();
-        var timeSeriesRaw = daily["Time Series (Daily)"];
-        var timeSeriesChildren = timeSeriesRaw.Children();
-        var instruments = timeSeriesChildren.Select(ins => ins.First().ToObject<Instrument>());
+      var daily = JObject.Parse(responseBody);
+      var metaData = daily["Meta Data"].ToObject<InstrumentMetaData>();
+      var timeSeriesRaw = daily["Time Series (Daily)"];
+      var timeSeriesChildren = timeSeriesRaw.Children();
+      var instruments = timeSeriesChildren.Select(ins => ins.First().ToObject<Instrument>());
 
-        var calculatedSma50 = CalculateSMA(_timePeriod50, instruments.Take(_timePeriod50));
-        var calculatedSma200 = CalculateSMA(_timePeriod200, instruments.Take(_timePeriod200));
-        //CWObject(metaData);
-        Console.WriteLine("SMA(" + _timePeriod50 + "): " + calculatedSma50);
-        Console.WriteLine("SMA(" + _timePeriod200 + "): " + calculatedSma200);
+      var calculatedSma50 = CalculateSMA(_timePeriod50, instruments.Take(_timePeriod50));
+      var calculatedSma200 = CalculateSMA(_timePeriod200, instruments.Take(_timePeriod200));
+      //CWObject(metaData);
+      Console.WriteLine("SMA(" + _timePeriod50 + "): " + calculatedSma50);
+      Console.WriteLine("SMA(" + _timePeriod200 + "): " + calculatedSma200);
     }
 
     private static decimal CalculateSMA(int term, IEnumerable<Instrument> instruments) => instruments.Sum(i => decimal.Parse(i.Close)) / term;
 
     #region Helper Classes
+    internal enum TrendType
+    {
+      Unknown,
+      Up,
+      Down,
+    }
+
+    internal enum ActionSignalType
+    {
+      Unknown,
+      Buy,
+      Sell,
+      Hold,
+    }
+
     internal class Instrument
     {
       [JsonProperty("1. open")]
@@ -235,6 +274,6 @@ namespace Altra
       public string ChangePct { get; set; }
     }
     #endregion
-    
+
   }
 }
