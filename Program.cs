@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -14,7 +15,7 @@ namespace Altra
     // Mid-term trend: 50 days
     // Long-term trend: 200 days
     private const string _apiKey = "C7PW7X54ISBEKC4N";
-    private const string _symbol = "IBM";
+    private const string _symbol = "TSLA";
     private const string _dailyAdjustedFuntionName = "TIME_SERIES_DAILY_ADJUSTED";
     private const string _globalQuoteFuntionName = "GLOBAL_QUOTE";
     private const string _smaFuntionName = "SMA";
@@ -24,20 +25,25 @@ namespace Altra
     private const int _timePeriod200 = 200;
     private const string _interval = "daily";
     private const string _seriesType = "close";
-    private readonly static HttpClient _client = new HttpClient();
+    private static decimal _account = 2500;
+    private static decimal _currentPrice = 0;
+    private static decimal _sma50 = 0;
+    private static decimal _sma200 = 0;
+    private static TrendType _trend = TrendType.Unknown;
+    private static Position _position;
+    private static HttpClient _client = new HttpClient();
 
     static async Task Main(string[] args)
     {
-      // https://www.alphavantage.co/documentation/#dailyadj
-      var dailyAdjustedUrl = $"https://www.alphavantage.co/query?function={_dailyAdjustedFuntionName}&symbol={_symbol}&outputsize=full&apikey={_apiKey}";
-      // https://www.alphavantage.co/documentation/#latestprice
-      var quoteUrl = $"https://www.alphavantage.co/query?function={_globalQuoteFuntionName}&symbol={_symbol}&apikey={_apiKey}";
-      // https://www.alphavantage.co/documentation/#sma
-      var sma50Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod50.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
-      var sma200Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod200.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
-
-      try
+      // TODO: while market open
+      while (true)
       {
+        // https://www.alphavantage.co/documentation/#latestprice
+        var quoteUrl = $"https://www.alphavantage.co/query?function={_globalQuoteFuntionName}&symbol={_symbol}&apikey={_apiKey}";
+        // https://www.alphavantage.co/documentation/#sma
+        var sma50Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod50.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
+        var sma200Url = $"https://www.alphavantage.co/query?function={_smaFuntionName}&symbol={_symbol}&interval={_interval}&time_period={_timePeriod200.ToString()}&series_type={_seriesType}&apikey={_apiKey}";
+
         // Moving Average
         // 1. Identify Trends (up, down)
         // if the price is > MA --> uptrend
@@ -52,7 +58,6 @@ namespace Altra
         // 4. BUY/SELL
         // if the price is > MA --> signal to BUY with stop loss below the MA
         // if the price is < MA --> signal to SELL with stop loss above the MA
-
 
         // TYPES
         // 1. SMA - Simple Moving Average
@@ -76,37 +81,48 @@ namespace Altra
         // Example 1: When a shorter period MA crosses above a longer period MA - signal uptrend --> signal to buy (Bullish).
         // Example 2: When a shorter period MA crosses below a longer period MA - signal downtrend --> signal to sell (Bearish).
 
-
-
-
-
+        Console.WriteLine(DateTime.UtcNow);
+        Console.WriteLine("Symbol: " + _symbol);
         // Get current price
         string quoteResponseBody = await _client.GetStringAsync(quoteUrl);
         var quote = ParseResponse<Quote>(quoteResponseBody, "Global Quote");
-        var currentPrice = quote.Price;
+        _currentPrice = decimal.Parse(quote.Price);
+        Console.WriteLine("Price: " + _currentPrice.ToString());
 
-        // Get current SMA50
-        var sma50 = await GetSma(sma50Url, _timePeriod50);
+        // Get current SMA50 & current SMA200
+        _sma50 = await GetSma(sma50Url, _timePeriod50);
+        _sma200 = await GetSma(sma200Url, _timePeriod200);
 
-        // Get current SMA200
-        var sma200 = await GetSma(sma200Url, _timePeriod200);
+        // Trend
+        _trend = UpdateTrend();
+        Console.WriteLine("Trend: " + _trend.ToString());
 
-        // Uptrend/Downtrend
-        var trend = string.Empty;
-        if(sma50 > sma200)
-          trend = "Uptrend";
-        else if (sma50 < sma200)
-          trend = "Downtrend";
-        else
-          trend = string.Empty;
-        
+        // Buy/Sell Signal
+        var actionSignal = GetActionSignal();
+        Console.WriteLine("Signal: " + actionSignal.ToString());
 
+        // Buy/Sell
+        switch (actionSignal)
+        {
+          case ActionSignalType.Buy:
+            Buy();
+            break;
+          case ActionSignalType.Sell:
+            Sell();
+            break;
+          case ActionSignalType.DoNothing:
+          case ActionSignalType.Unknown:
+          default:
+            break;
+        }
+        Console.WriteLine("***************************");
+        Console.WriteLine("Position: " + string.Format("{0:C}", _position.Value));
+        Console.WriteLine("Cash: " + string.Format("{0:C}", _account));
+        Console.WriteLine("Total: " + string.Format("{0:C}", _position.Value + _account));
+        Console.WriteLine("***************************");
 
-      }
-      catch (HttpRequestException e)
-      {
-        Console.WriteLine("\nException Caught!");
-        Console.WriteLine("Message :{0} ", e.Message);
+        // Sleep for 5 min and repeat
+        Thread.Sleep(60000);
       }
     }
 
@@ -115,24 +131,123 @@ namespace Altra
       var quoteRaw = JObject.Parse(responseBody);
       return quoteRaw[token].ToObject<T>();
     }
-    private static void CWObject(object obj)
+    private static void CWObject(object obj, int indent = 0)
     {
       var type = obj.GetType();
       var properties = type.GetProperties();
       foreach (var p in properties)
       {
-        Console.WriteLine(p.Name + ": " + p.GetValue(obj));
+        Console.WriteLine(Indent(indent) + p.Name + ": " + p.GetValue(obj));
       }
     }
     private static async Task<decimal> GetSma(string url, int timePeriod)
     {
-      string smaResponseBody = await _client.GetStringAsync(url);
-      var smaRaw = JObject.Parse(smaResponseBody);
-      var smaMetaData = smaRaw["Meta Data"].ToObject<SmaMetaData>();
-      var sma = smaRaw["Technical Analysis: SMA"][smaMetaData.LastRefreshed]["SMA"].ToObject<string>();
-      Console.WriteLine("Alpha SMA(" + _timePeriod200.ToString() + "): " + sma);
-      return decimal.Parse(sma);    
+      decimal smaResult = 0;
+      try
+      {
+        HttpResponseMessage response = await _client.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+        string responseBody = await response.Content.ReadAsStringAsync();
+        // string responseBody = await _client.GetStringAsync(url);
+        var smaRaw = JObject.Parse(responseBody);
+        var smaMetaData = smaRaw["Meta Data"].ToObject<SmaMetaData>();
+        var sma = smaRaw["Technical Analysis: SMA"][smaMetaData.LastRefreshed]["SMA"].ToObject<string>();
+        Console.WriteLine("SMA(" + timePeriod.ToString() + "): " + sma);
+        smaResult = decimal.Parse(sma);
+      }
+      catch (HttpRequestException e)
+      {
+        Console.WriteLine("\nException Caught!");
+        Console.WriteLine("Message :{0} ", e.Message);
+      }
+      return smaResult;
     }
+    private static TrendType UpdateTrend()
+    {
+      if ((_trend == TrendType.Unknown || _trend == TrendType.Down) && _sma50 > _sma200)
+        _trend = TrendType.Up;
+      else if ((_trend == TrendType.Unknown || _trend == TrendType.Up) && _sma50 < _sma200)
+        _trend = TrendType.Down;
+      // else
+      //   _trend = TrendType.Unknown;
+      return _trend;
+    }
+    private static ActionSignalType GetActionSignal()
+    {
+      // if currently holding a position do nothing
+      if (_position != null)
+        return ActionSignalType.DoNothing;
+
+      switch (_trend)
+      {
+        case TrendType.Up:
+          return ActionSignalType.Buy;
+        case TrendType.Down:
+          return ActionSignalType.Sell;
+        case TrendType.Unknown:
+        default:
+          return ActionSignalType.DoNothing; ;
+      }
+    }
+    private static void Buy()
+    {
+      if (_account <= 0)
+      {
+        Console.WriteLine("Cannot Buy! Insufficient funds.");
+      }
+      else
+      {
+        if (_position != null)
+        {
+          Console.WriteLine("Cannot Buy! Currently holding position:");
+        }
+        else
+        {
+          // How many shares can we buy?
+          // Round down to the nearest int
+          var numOfInstruments = Convert.ToInt32(Math.Floor(_account / _currentPrice));
+          if (numOfInstruments < 1)
+          {
+            Console.WriteLine("Cannot Buy! Insufficient funds to buy a whole share.");
+          }
+          else
+          {
+            // Total value of position
+            var positionValue = numOfInstruments * _currentPrice;
+            // Debit account
+            _account -= positionValue;
+
+            _position = new Position()
+            {
+              Symbol = _symbol,
+              Count = numOfInstruments,
+              Value = positionValue,
+              PurchasePrice = _currentPrice,
+            };
+            Console.WriteLine("Successfully purchased position:");
+          }
+        }
+      }
+      CWObject(_position, 2);
+    }
+    private static void Sell()
+    {
+      if (_position == null)
+      {
+        Console.WriteLine("Cannot Sell! No position to sell.");
+      }
+      else
+      {
+        // Total value of position
+        var positionValue = _position.Count * _currentPrice;
+        // Credit account
+        _account += positionValue;
+
+        _position = null;
+        Console.WriteLine("Successfully sold position.");
+      }
+    }
+
     private static async Task Test()
     {
       // https://www.alphavantage.co/documentation/#dailyadj
@@ -158,7 +273,24 @@ namespace Altra
 
     private static decimal CalculateSMA(int term, IEnumerable<Instrument> instruments) => instruments.Sum(i => decimal.Parse(i.Close)) / term;
 
+    private static string Indent(int count) => "".PadLeft(count);
+
     #region Helper Classes
+    internal enum TrendType
+    {
+      Unknown,
+      Up,
+      Down,
+    }
+
+    internal enum ActionSignalType
+    {
+      Unknown,
+      Buy,
+      Sell,
+      DoNothing,
+    }
+
     internal class Instrument
     {
       [JsonProperty("1. open")]
@@ -234,7 +366,15 @@ namespace Altra
       [JsonProperty("10. change percent")]
       public string ChangePct { get; set; }
     }
+
+    internal class Position
+    {
+      public string Symbol { get; set; }
+      public int Count { get; set; }
+      public decimal Value { get; set; }
+      public decimal PurchasePrice { get; set; }
+      public decimal SalePrice { get; set; }
+    }
     #endregion
-    
   }
 }
