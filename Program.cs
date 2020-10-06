@@ -94,11 +94,11 @@ namespace Altra
         _sma200 = await GetSma(sma200Url, _timePeriod200);
 
         // Trend
-        _trend = UpdateTrend();
+        _trend = UpdateTrend(_trend, _sma50, _sma200);
         Console.WriteLine("Trend: " + _trend.ToString());
 
         // Buy/Sell Signal
-        var actionSignal = GetActionSignal();
+        var actionSignal = GetActionSignal(_trend);
         Console.WriteLine("Signal: " + actionSignal.ToString());
 
         // Buy/Sell
@@ -162,23 +162,24 @@ namespace Altra
       }
       return smaResult;
     }
-    private static TrendType UpdateTrend(decimal sma50, decimal sma200)
+    private static TrendType UpdateTrend(TrendType currentTrend, decimal sma50, decimal sma200)
     {
-      if ((_trend == TrendType.Unknown || _trend == TrendType.Down) && sma50 > sma200)
-        _trend = TrendType.Up;
+      var newTrend = TrendType.Unknown;
+      if ((currentTrend == TrendType.Unknown || currentTrend == TrendType.Down) && sma50 > sma200)
+        newTrend = TrendType.Up;
       else if ((_trend == TrendType.Unknown || _trend == TrendType.Up) && sma50 < sma200)
-        _trend = TrendType.Down;
+        newTrend = TrendType.Down;
       // else
       //   _trend = TrendType.Unknown;
-      return _trend;
+      return newTrend;
     }
-    private static ActionSignalType GetActionSignal()
+    private static ActionSignalType GetActionSignal(TrendType trend)
     {
       // if currently holding a position do nothing
       if (_position != null)
         return ActionSignalType.DoNothing;
 
-      switch (_trend)
+      switch (trend)
       {
         case TrendType.Up:
           return ActionSignalType.Buy;
