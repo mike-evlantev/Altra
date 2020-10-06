@@ -100,7 +100,7 @@ namespace Altra
         else
           trend = string.Empty;
         
-        
+
 
       }
       catch (HttpRequestException e)
@@ -124,7 +124,6 @@ namespace Altra
         Console.WriteLine(p.Name + ": " + p.GetValue(obj));
       }
     }
-
     private static async Task<decimal> GetSma(string url, int timePeriod)
     {
       string smaResponseBody = await _client.GetStringAsync(url);
@@ -136,23 +135,25 @@ namespace Altra
     }
     private static async Task Test()
     {
+      // https://www.alphavantage.co/documentation/#dailyadj
+      var dailyAdjustedUrl = $"https://www.alphavantage.co/query?function={_dailyAdjustedFuntionName}&symbol={_symbol}&outputsize=full&apikey={_apiKey}";
       // HttpResponseMessage response = await _client.GetAsync(dailyAdjustedUrl);
-        // response.EnsureSuccessStatusCode();
-        // string responseBody = await response.Content.ReadAsStringAsync();
-        // Above three lines can be replaced with new helper method below
-        string responseBody = await _client.GetStringAsync(dailyAdjustedUrl);
+      // response.EnsureSuccessStatusCode();
+      // string responseBody = await response.Content.ReadAsStringAsync();
+      // Above three lines can be replaced with new helper method below
+      string responseBody = await _client.GetStringAsync(dailyAdjustedUrl);
 
-        var daily = JObject.Parse(responseBody);
-        var metaData = daily["Meta Data"].ToObject<InstrumentMetaData>();
-        var timeSeriesRaw = daily["Time Series (Daily)"];
-        var timeSeriesChildren = timeSeriesRaw.Children();
-        var instruments = timeSeriesChildren.Select(ins => ins.First().ToObject<Instrument>());
+      var daily = JObject.Parse(responseBody);
+      var metaData = daily["Meta Data"].ToObject<InstrumentMetaData>();
+      var timeSeriesRaw = daily["Time Series (Daily)"];
+      var timeSeriesChildren = timeSeriesRaw.Children();
+      var instruments = timeSeriesChildren.Select(ins => ins.First().ToObject<Instrument>());
 
-        var calculatedSma50 = CalculateSMA(_timePeriod50, instruments.Take(_timePeriod50));
-        var calculatedSma200 = CalculateSMA(_timePeriod200, instruments.Take(_timePeriod200));
-        //CWObject(metaData);
-        Console.WriteLine("SMA(" + _timePeriod50 + "): " + calculatedSma50);
-        Console.WriteLine("SMA(" + _timePeriod200 + "): " + calculatedSma200);
+      var calculatedSma50 = CalculateSMA(_timePeriod50, instruments.Take(_timePeriod50));
+      var calculatedSma200 = CalculateSMA(_timePeriod200, instruments.Take(_timePeriod200));
+      //CWObject(metaData);
+      Console.WriteLine("SMA(" + _timePeriod50 + "): " + calculatedSma50);
+      Console.WriteLine("SMA(" + _timePeriod200 + "): " + calculatedSma200);
     }
 
     private static decimal CalculateSMA(int term, IEnumerable<Instrument> instruments) => instruments.Sum(i => decimal.Parse(i.Close)) / term;
@@ -198,7 +199,6 @@ namespace Altra
       public string Symbol { get; set; }
       [JsonProperty("2: Indicator")]
       public string Indicator { get; set; }
-
       [JsonProperty("3: Last Refreshed")]
       public string LastRefreshed { get; set; }
       [JsonProperty("4: Interval")]
