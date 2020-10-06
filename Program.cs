@@ -162,11 +162,11 @@ namespace Altra
       }
       return smaResult;
     }
-    private static TrendType UpdateTrend()
+    private static TrendType UpdateTrend(decimal sma50, decimal sma200)
     {
-      if ((_trend == TrendType.Unknown || _trend == TrendType.Down) && _sma50 > _sma200)
+      if ((_trend == TrendType.Unknown || _trend == TrendType.Down) && sma50 > sma200)
         _trend = TrendType.Up;
-      else if ((_trend == TrendType.Unknown || _trend == TrendType.Up) && _sma50 < _sma200)
+      else if ((_trend == TrendType.Unknown || _trend == TrendType.Up) && sma50 < sma200)
         _trend = TrendType.Down;
       // else
       //   _trend = TrendType.Unknown;
