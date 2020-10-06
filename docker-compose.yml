@@ -1,0 +1,9 @@
+
+version: '3.4'
+
+services:
+  altra:
+    image: altra
+    build:
+      context: .
+      dockerfile: ./Dockerfile
