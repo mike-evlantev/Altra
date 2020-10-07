@@ -276,6 +276,49 @@ namespace Altra
 
     private static string Indent(int count) => "".PadLeft(count);
 
+    // Warren Buffett's Interpretation of Financial Statements
+    private static async Task AnalyzeFinStatements(string symbol)
+    {
+      // Considering the last 10 years of statements 
+      // Example used: AAPL (FY18)
+
+      // Income statement
+      // 1. Growth of Net Income (Loss) aka bottom line over time
+
+      // 2. Gross Margin - Scalability: The more the company sells the greater the profitability
+      // Gross profit / Revenue * 100 (strong result 40% or higher)
+      // Example: $101,839 / $265,595 * 100 = 38.3% 
+
+      // 3. Net Margin
+      // Net Income (Loss) / Revenue * 100 (strong result 20% or higher)
+      // Example: $59,531 / $265,595 * 100 = 22.4%
+
+      // Balance Sheet
+      // 1. Growth of Retained earnings - reinvestment of Net Income back into company
+
+      // 2. Return on Equity (ROE) - measures how efficient the company is using reinvested earnings
+      // Net Income (Loss) (Income Statement) / Total Equity (Balance sheet) * 100 ()
+      // Example: $59,531 / $107,147 * 100 = 55.6%
+
+      // 3. TODO: Return on Net Tangible Assets
+
+      // 4. Long-term Debt
+      // If a company can pay off all of its long-term debt with less than 4 years of earnings -> string result
+
+      // Cashflow statement - in's 'n' out's of money
+      // 1. Capital Expenditures - money spent on properties, equipment
+      // Capital Expenditures / Net Income (Loss) * 100 (25% - strong; 50% - acceptable)
+      // Example: -$13,313 / $59,531 * 100 = 22.4% (ignores negative sign??)
+
+      // 2. TODO: Augmented pay out ratio??
+
+      // When to sell?
+      // 1. When you need funds for a better investment
+      // 2. When a company loses its comptetive advantage
+      // 3. When a market is crazy Bullish - if the P/E ration > 40 consider selling
+
+    }
+
     #region Helper Classes
     internal enum TrendType
     {
